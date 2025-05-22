@@ -1,0 +1,16 @@
+{
+  "name": "haredi-radio-player",
+  "version": "1.0.0",
+  "description": "A web server to display Haredi radio stations.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["radio", "music", "hebrew", "stations", "haredi"],
+  "author": "david031355",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5"
+  }
+}
