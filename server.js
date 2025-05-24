@@ -11,37 +11,64 @@ app.use(cors());
 const clientRewritingScript = `
 <script>
     (function() {
+        // בודק אם הסקריפט כבר הוזרק כדי למנוע כפילויות
+        if (window._proxyRewritingScriptLoaded) {
+            return;
+        }
+        window._proxyRewritingScriptLoaded = true;
+
         const proxyBaseUrl = window.location.origin + '/proxy?url=';
+
+        function rewriteUrlClient(originalUrl) {
+            if (!originalUrl) return originalUrl;
+            try {
+                const url = new URL(originalUrl, window.location.href);
+                return proxyBaseUrl + encodeURIComponent(url.href);
+            } catch (e) {
+                console.warn('[Client] Could not rewrite URL:', originalUrl, e);
+                return originalUrl; // Fallback to original if invalid URL
+            }
+        }
 
         function rewriteAndFetch(originalFetch) {
             return function(...args) {
                 let [resource, options] = args;
                 if (typeof resource === 'string') {
+                    resource = rewriteUrlClient(resource);
+                    console.log('Rewrote fetch URL:', resource);
+                } else if (resource instanceof Request) {
+                    // טיפול באובייקט Request - ניצור אובייקט חדש עם URL משוכתב
                     try {
-                        const url = new URL(resource, window.location.href);
-                        resource = proxyBaseUrl + encodeURIComponent(url.href);
-                        console.log('Rewrote fetch URL:', resource);
+                        const newUrl = rewriteUrlClient(resource.url);
+                        const newRequest = new Request(newUrl, {
+                            method: resource.method,
+                            headers: new Headers(resource.headers),
+                            body: resource.bodyUsed ? undefined : resource.body, // לא ניתן לקרוא body פעמיים
+                            mode: resource.mode,
+                            credentials: resource.credentials,
+                            cache: resource.cache,
+                            redirect: resource.redirect,
+                            referrer: resource.referrer,
+                            integrity: resource.integrity,
+                            keepalive: resource.keepalive,
+                            signal: resource.signal,
+                            // Add other Request properties as needed
+                        });
+                        resource = newRequest;
+                        console.log('Rewrote fetch Request object URL:', newUrl);
                     } catch (e) {
-                        console.warn('Could not rewrite fetch URL:', resource, e);
+                        console.warn('Could not rewrite fetch Request object:', resource.url, e);
                     }
                 }
-                // אם resource הוא אובייקט Request, נצטרך לטפל בזה בצורה מורכבת יותר.
-                // בשלב זה נניח שהוא מחרוזת.
                 return originalFetch(resource, options);
             };
         }
 
         function rewriteAndOpen(originalOpen) {
             return function(method, url, ...args) {
-                try {
-                    const fullUrl = new URL(url, window.location.href);
-                    const rewrittenUrl = proxyBaseUrl + encodeURIComponent(fullUrl.href);
-                    console.log('Rewrote XMLHttpRequest URL:', rewrittenUrl);
-                    return originalOpen.call(this, method, rewrittenUrl, ...args);
-                } catch (e) {
-                    console.warn('Could not rewrite XMLHttpRequest URL:', url, e);
-                    return originalOpen.call(this, method, url, ...args); // Fallback to original
-                }
+                const rewrittenUrl = rewriteUrlClient(url);
+                console.log('Rewrote XMLHttpRequest URL:', rewrittenUrl);
+                return originalOpen.call(this, method, rewrittenUrl, ...args);
             };
         }
 
@@ -60,7 +87,7 @@ const clientRewritingScript = `
             if (form && form.tagName === 'FORM' && form.action) {
                 try {
                     const originalAction = new URL(form.action, window.location.href);
-                    const rewrittenAction = proxyBaseUrl + encodeURIComponent(originalAction.href);
+                    const rewrittenAction = rewriteUrlClient(originalAction.href);
                     if (form.action !== rewrittenAction) {
                         form.action = rewrittenAction;
                         console.log('Rewrote form action:', form.action);
@@ -354,10 +381,15 @@ app.get('/proxy', async (req, res) => {
         const requestHeaders = {
             'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Accept': req.headers['accept'] || '*/*',
-            'Accept-Encoding': 'identity',
+            'Accept-Encoding': 'identity', // חשוב כדי למנוע דחיסה שאנחנו לא מפרקים
             'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
             'Connection': 'keep-alive',
-            'Referer': targetUrl // שולח את ה-URL המקורי כ-Referer
+            'Referer': targetUrl, // שולח את ה-URL המקורי כ-Referer
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1',
         };
 
         response = await axios.get(targetUrl, {
@@ -442,13 +474,8 @@ app.get('/proxy', async (req, res) => {
             responseData = Buffer.from(cssText, 'utf8');
 
         } else if (contentType && (contentType.includes('application/javascript') || contentType.includes('text/javascript'))) {
-            // בשלב זה, אנו מעבירים קובצי JS כפי שהם, אך ה-clientRewritingScript
-            // אמור ליירט קריאות רשת מתוכם.
-            // אין צורך לשכתב את תוכן ה-JS עצמו בשרת כרגע.
             console.log(`[Server] Serving JavaScript file: ${targetUrl} (client-side rewriting enabled via injected script).`);
         }
-        // עבור סוגי תוכן אחרים (תמונות, וידאו וכו'), נשלח אותם ישירות
-        // כי הם לא דורשים שכתוב פנימי.
 
         const headersToExclude = [
             'content-encoding', 'transfer-encoding', 'connection', 'keep-alive',
