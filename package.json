@@ -6,12 +6,21 @@
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": ["radio", "music", "hebrew", "stations", "haredi", "proxy", "web"],
+  "keywords": [
+    "radio",
+    "music",
+    "hebrew",
+    "stations",
+    "haredi",
+    "proxy",
+    "web"
+  ],
   "author": "david031355",
   "license": "ISC",
   "dependencies": {
-    "express": "^4.19.2",
+    "axios": "^1.7.2",
+    "cheerio": "^1.0.0",
     "cors": "^2.8.5",
-    "axios": "^1.7.2"
+    "express": "^4.19.2"
   }
 }

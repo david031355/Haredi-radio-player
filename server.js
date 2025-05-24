@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const cheerio = require('cheerio'); // ייבוא ספריית cheerio
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -8,7 +9,6 @@ app.use(cors());
 
 // --- נתיב לדף הבית (ה"נקי" של הרדיו + פרוקסי UI) ---
 app.get('/', (req, res) => {
-    // שימו לב לשימוש ב-backticks (`) כדי להגדיר מחרוזת רב-שורתית
     const pageHtml = `
 <!DOCTYPE html>
 <html lang="he">
@@ -197,7 +197,6 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
-        // Script 1: Audio Player Logic
         let currentActiveItem = null;
 
         function playAudio(audioURL, clickedElement) {
@@ -231,7 +230,6 @@ app.get('/', (req, res) => {
     </footer>
 
     <script>
-        // Script 2: Proxy Form Logic
         document.getElementById('proxyForm').addEventListener('submit', async function(event) {
             event.preventDefault();
             const url = document.getElementById('urlInput').value;
@@ -244,46 +242,150 @@ app.get('/', (req, res) => {
                 return;
             }
 
-            const proxyUrl = \`/proxy?url=\${encodeURIComponent(url)}\`; // שימוש ב-backticks גם כאן
+            // נשלח את הבקשה לשרת הפרוקסי שלנו
+            const proxyUrl = \`/proxy?url=\${encodeURIComponent(url)}\`;
             proxyFrame.src = proxyUrl;
         });
     </script>
 
 </body>
 </html>
-    `; // סגירת המחרוזת הרב-שורתית כאן - וודא שזה בדיוק בסוף ה-HTML
+    `;
     res.header('Content-Type', 'text/html; charset=utf-8');
     res.send(pageHtml);
 });
 
+// פונקציית עזר לשכתוב URL
+function rewriteUrl(originalUrl, baseUrlOfProxy, targetBaseUrl) {
+    if (!originalUrl) return originalUrl;
+
+    try {
+        // אם ה-URL יחסי (לדוגמה, /images/logo.png), הפוך אותו לאבסולוטי יחסית ל-targetBaseUrl
+        const parsedOriginal = new URL(originalUrl, targetBaseUrl);
+        const fullOriginalUrl = parsedOriginal.href;
+
+        // בנה את ה-URL החדש שיפנה לנקודת הקצה של הפרוקסי שלך
+        const rewritten = new URL(baseUrlOfProxy + '/proxy');
+        rewritten.searchParams.set('url', fullOriginalUrl); // שמור את ה-URL המקורי כפרמטר
+        return rewritten.href;
+    } catch (e) {
+        // אם זה לא URL תקין או שיש שגיאה, החזר אותו כפי שהוא
+        console.warn(`Could not rewrite URL: ${originalUrl}, Error: ${e.message}`);
+        return originalUrl;
+    }
+}
+
 // --- נתיב הפרוקסי ---
 app.get('/proxy', async (req, res) => {
-    const targetUrl = req.query.url;
+    const targetUrl = req.query.url; // קבלת ה-URL מה-query parameter
 
     if (!targetUrl) {
         return res.status(400).send('URL parameter is missing.');
     }
 
+    let response;
     try {
-        const response = await axios.get(targetUrl, {
-            responseType: 'arraybuffer',
+        response = await axios.get(targetUrl, {
+            responseType: 'arraybuffer', // לקבל נתונים בינאריים כדי לטפל בכל סוגי התוכן
             headers: {
                 'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                 'Accept': req.headers['accept'] || '*/*',
-                'Accept-Encoding': req.headers['accept-encoding'] || 'identity',
+                'Accept-Encoding': 'identity', // חשוב לא לבקש דחיסה, נטפל בזה ידנית אם נרצה
                 'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
-                'Connection': 'keep-alive'
-            }
+                'Connection': 'keep-alive',
+                'Referer': targetUrl // לשלוח Referer כדי שהאתר יחשוב שהבקשה מגיעה ממנו
+            },
+            validateStatus: function (status) {
+                return status >= 200 && status < 400; // אל תזרוק שגיאה עבור הפניות 3xx
+            },
+            maxRedirects: 0 // אנחנו נטפל בהפניות ידנית
         });
 
-        const headersToExclude = ['content-encoding', 'transfer-encoding', 'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization'];
+        // טיפול בהפניות (3xx statuses)
+        if (response.status >= 300 && response.status < 400 && response.headers.location) {
+            const redirectUrl = response.headers.location;
+            const baseUrlOfProxy = `${req.protocol}://${req.get('host')}`;
+            const rewrittenRedirectUrl = rewriteUrl(redirectUrl, baseUrlOfProxy, targetUrl);
+            res.redirect(response.status, rewrittenRedirectUrl); // שלח את ההפניה המשוכתבת
+            return;
+        }
+
+        // הגדרת ה-base URL של הפרוקסי עבור פונקציית השכתוב
+        const baseUrlOfProxy = `${req.protocol}://${req.get('host')}`;
+        let responseData = response.data;
+        const contentType = response.headers['content-type'];
+
+        // נשכתב רק אם התוכן הוא HTML
+        if (contentType && contentType.includes('text/html')) {
+            const $ = cheerio.load(responseData.toString('utf8')); // וודא שזה טקסט UTF-8
+
+            // שכתוב קישורי HTML
+            $('a[href], link[href], img[src], script[src], iframe[src], video[src], audio[src], source[src]').each((i, elem) => {
+                const element = $(elem);
+                let attr = element.attr('href') ? 'href' : 'src'; // ברירת מחדל ל-src אם אין href
+                if (elem.tagName === 'FORM') {
+                    attr = 'action';
+                }
+
+                const originalValue = element.attr(attr);
+                if (originalValue) {
+                    element.attr(attr, rewriteUrl(originalValue, baseUrlOfProxy, targetUrl));
+                }
+            });
+
+            // שכתוב action של טפסים
+            $('form[action]').each((i, elem) => {
+                const element = $(elem);
+                const originalAction = element.attr('action');
+                if (originalAction) {
+                    element.attr('action', rewriteUrl(originalAction, baseUrlOfProxy, targetUrl));
+                    // חשוב: אם הטופס הוא POST, תצטרך גם לטפל בנתוני ה-POST בפרוקסי
+                    // זה דורש מידלוור מיוחד (`app.use(express.urlencoded({ extended: true }));`)
+                    // וטיפול ב-req.method === 'POST' בנתיב /proxy.
+                }
+            });
+
+            // שכתוב CSS בתוך תגי <style>
+            $('style').each((i, elem) => {
+                let cssText = $(elem).html();
+                if (cssText) {
+                    cssText = cssText.replace(/url\(['"]?(.*?)['"]?\)/g, (match, url) => {
+                        return `url('${rewriteUrl(url, baseUrlOfProxy, targetUrl)}')`;
+                    });
+                    $(elem).html(cssText);
+                }
+            });
+
+            // ניסיון להסיר את ה-base tag אם קיים, או לשנות אותו
+            $('base[href]').each((i, elem) => {
+                $(elem).remove(); // הסר את תג ה-base כדי למנוע בעיות עם URL יחסיים
+            });
+
+            // ניסיון להסיר סקריפטים שעלולים לגרום לבעיות Same-Origin
+            // זה צעד דרסטי ועלול לשבור אתרים, השתמש בזהירות!
+            // $('script').remove();
+
+            // המרה חזרה לבאפר לפני שליחה
+            responseData = Buffer.from($.html(), 'utf8');
+        }
+
+        // העברת הכותרות המקוריות מהשרת היעד לדפדפן
+        // הסרת כותרות אבטחה שעלולות לחסום הטמעה ב-iframe
+        const headersToExclude = [
+            'content-encoding', 'transfer-encoding', 'connection', 'keep-alive',
+            'proxy-authenticate', 'proxy-authorization',
+            'content-security-policy', 'x-frame-options', 'strict-transport-security',
+            'set-cookie' // טיפול בעוגיות מורכב יותר, אז נסיר אותן בשלב זה
+        ];
+
         for (const key in response.headers) {
             if (response.headers.hasOwnProperty(key) && !headersToExclude.includes(key.toLowerCase())) {
                 res.setHeader(key, response.headers[key]);
             }
         }
+        res.setHeader('Content-Type', contentType || 'application/octet-stream'); // וודא שה-Content-Type נשמר
 
-        res.send(response.data);
+        res.send(responseData);
 
     } catch (error) {
         console.error('Proxy request failed:', error.message);
@@ -298,6 +400,7 @@ app.get('/proxy', async (req, res) => {
     }
 });
 
+// מפעיל את השרת
 app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
     console.log(`Visit http://localhost:${PORT} to see the radio and proxy page.`);
