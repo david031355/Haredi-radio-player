@@ -301,20 +301,37 @@ app.get('/proxy', async (req, res) => {
 
     let response;
     try {
-        const urlObj = new URL(targetUrl);
-      const requestHeaders = {
-            'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-            'Accept': req.headers['accept'] || '*/*',
-            'Accept-Encoding': 'identity', // חשוב כדי למנוע דחיסה שאנחנו לא מפרקים
-            'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
+       const requestHeaders = {
+            // ננסה User-Agent עדכני יותר של Chrome
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Accept': req.headers['accept'] || 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Encoding': 'identity',
+            'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9,he;q=0.8',
             'Connection': 'keep-alive',
-            'Referer': encodeURI(targetUrl), // *** התיקון כאן ***
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
+            'Referer': encodeURI(targetUrl), // מקודד את ה-URL לפני שליחה בכותרת Referer
+            'Origin': urlObj.origin, // הוספת כותרת Origin
+            'Host': urlObj.host,     // הוספת כותרת Host
+            'Sec-Fetch-Dest': req.headers['sec-fetch-dest'] || 'document',
+            'Sec-Fetch-Mode': req.headers['sec-fetch-mode'] || 'navigate',
+            'Sec-Fetch-Site': req.headers['sec-fetch-site'] || 'none',
+            'Sec-Fetch-User': req.headers['sec-fetch-user'] || '?1',
             'Upgrade-Insecure-Requests': '1',
+            // אפשר לנסות להעביר חלק מכותרות המקור מהלקוח כפי שהן
+            // 'Cookie': req.headers['cookie'] || '', // זה ידרוש טיפול בעוגיות
+            // 'X-Requested-With': req.headers['x-requested-with'] || '', // אם רלוונטי ל-AJAX
         };
+
+        // --- הוספה חדשה: הוספת header לנטפרי עבור תמונות ---
+        // בדיקה לפי סיומת קובץ - לא מושלם אבל מכסה את רוב המקרים
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+        const urlPath = urlObj.pathname.toLowerCase();
+        const isImage = imageExtensions.some(ext => urlPath.endsWith(ext));
+
+        if (isImage) {
+            requestHeaders['x-netfree-option-no-send-images'] = '1';
+            console.log(`[Server] Added x-netfree-option-no-send-images header for image: ${targetUrl}`);
+        }
+        // --- סוף הוספה חדשה ---
 
         // --- הוספה חדשה: הוספת header לנטפרי עבור תמונות ---
         // בדיקה לפי סיומת קובץ - לא מושלם אבל מכסה את רוב המקרים
