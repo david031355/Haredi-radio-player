@@ -302,13 +302,13 @@ app.get('/proxy', async (req, res) => {
     let response;
     try {
         const urlObj = new URL(targetUrl);
-        const requestHeaders = {
+      const requestHeaders = {
             'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Accept': req.headers['accept'] || '*/*',
             'Accept-Encoding': 'identity', // חשוב כדי למנוע דחיסה שאנחנו לא מפרקים
             'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
             'Connection': 'keep-alive',
-            'Referer': targetUrl, // שולח את ה-URL המקורי כ-Referer
+            'Referer': encodeURI(targetUrl), // *** התיקון כאן ***
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Site': 'none',
