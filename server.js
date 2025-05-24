@@ -7,6 +7,74 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
+// קוד JavaScript שיוזרק לכל דף HTML כדי ליירט בקשות רשת
+const clientRewritingScript = `
+<script>
+    (function() {
+        const proxyBaseUrl = window.location.origin + '/proxy?url=';
+
+        function rewriteAndFetch(originalFetch) {
+            return function(...args) {
+                let [resource, options] = args;
+                if (typeof resource === 'string') {
+                    try {
+                        const url = new URL(resource, window.location.href);
+                        resource = proxyBaseUrl + encodeURIComponent(url.href);
+                        console.log('Rewrote fetch URL:', resource);
+                    } catch (e) {
+                        console.warn('Could not rewrite fetch URL:', resource, e);
+                    }
+                }
+                // אם resource הוא אובייקט Request, נצטרך לטפל בזה בצורה מורכבת יותר.
+                // בשלב זה נניח שהוא מחרוזת.
+                return originalFetch(resource, options);
+            };
+        }
+
+        function rewriteAndOpen(originalOpen) {
+            return function(method, url, ...args) {
+                try {
+                    const fullUrl = new URL(url, window.location.href);
+                    const rewrittenUrl = proxyBaseUrl + encodeURIComponent(fullUrl.href);
+                    console.log('Rewrote XMLHttpRequest URL:', rewrittenUrl);
+                    return originalOpen.call(this, method, rewrittenUrl, ...args);
+                } catch (e) {
+                    console.warn('Could not rewrite XMLHttpRequest URL:', url, e);
+                    return originalOpen.call(this, method, url, ...args); // Fallback to original
+                }
+            };
+        }
+
+        // Apply rewrites
+        if (typeof window.fetch === 'function') {
+            window.fetch = rewriteAndFetch(window.fetch);
+        }
+        if (typeof window.XMLHttpRequest !== 'undefined') {
+            window.XMLHttpRequest.prototype.open = rewriteAndOpen(window.XMLHttpRequest.prototype.open);
+        }
+
+        // גם לטפל בהפניות של form submissions אם הן לא נקלטות ע"י ה-action attribute
+        // זה לא קשור ישירות ל-fetch/XHR, אבל זה מנגנון נוסף
+        document.addEventListener('submit', function(e) {
+            const form = e.target;
+            if (form && form.tagName === 'FORM' && form.action) {
+                try {
+                    const originalAction = new URL(form.action, window.location.href);
+                    const rewrittenAction = proxyBaseUrl + encodeURIComponent(originalAction.href);
+                    if (form.action !== rewrittenAction) {
+                        form.action = rewrittenAction;
+                        console.log('Rewrote form action:', form.action);
+                    }
+                } catch (err) {
+                    console.warn('Could not rewrite form action:', form.action, err);
+                }
+            }
+        }, true); // Use capture phase to catch before other handlers
+    })();
+</script>
+`;
+
+
 // --- נתיב לדף הבית (ה"נקי" של הרדיו + פרוקסי UI) ---
 app.get('/', (req, res) => {
     const pageHtml = `
@@ -255,8 +323,8 @@ app.get('/', (req, res) => {
     res.send(pageHtml);
 });
 
-// פונקציית עזר לשכתוב URL
-function rewriteUrl(originalUrl, baseUrlOfProxy, targetBaseUrl) {
+// פונקציית עזר לשכתוב URL בשרת
+function rewriteUrlServer(originalUrl, baseUrlOfProxy, targetBaseUrl) {
     if (!originalUrl) return originalUrl;
 
     try {
@@ -267,10 +335,7 @@ function rewriteUrl(originalUrl, baseUrlOfProxy, targetBaseUrl) {
         rewritten.searchParams.set('url', fullOriginalUrl);
         return rewritten.href;
     } catch (e) {
-        // שגיאות ניתוח URL יכולות לקרות עם נתיבים יחסיים מסוימים
-        // במקום להחזיר את המקורי, במקרים אלה אנו רוצים שזה יכשל בבירור,
-        // אבל עבור פרוקסי בסיסי, נחזיר את המקורי ונציין אזהרה.
-        console.warn(`Could not rewrite URL: ${originalUrl}, Error: ${e.message}`);
+        console.warn(`[Server] Could not rewrite URL: ${originalUrl}, Error: ${e.message}`);
         return originalUrl;
     }
 }
@@ -285,7 +350,6 @@ app.get('/proxy', async (req, res) => {
 
     let response;
     try {
-        // טיפול ב-HTTPS והגדרת Referer
         const urlObj = new URL(targetUrl);
         const requestHeaders = {
             'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -300,16 +364,15 @@ app.get('/proxy', async (req, res) => {
             responseType: 'arraybuffer', // לקבל נתונים בינאריים
             headers: requestHeaders,
             validateStatus: function (status) {
-                return status >= 200 && status < 400; // אל תזרוק שגיאה עבור הפניות 3xx
+                return status >= 200 && status < 400;
             },
-            maxRedirects: 0 // אנחנו נטפל בהפניות ידנית
+            maxRedirects: 0
         });
 
-        // טיפול בהפניות (3xx statuses)
         if (response.status >= 300 && response.status < 400 && response.headers.location) {
             const redirectUrl = response.headers.location;
             const baseUrlOfProxy = `${req.protocol}://${req.get('host')}`;
-            const rewrittenRedirectUrl = rewriteUrl(redirectUrl, baseUrlOfProxy, targetUrl);
+            const rewrittenRedirectUrl = rewriteUrlServer(redirectUrl, baseUrlOfProxy, targetUrl);
             res.redirect(response.status, rewrittenRedirectUrl);
             return;
         }
@@ -318,25 +381,25 @@ app.get('/proxy', async (req, res) => {
         let responseData = response.data;
         const contentType = response.headers['content-type'];
 
-        // --- לוגיקה לשכתוב תוכן בהתאם ל-Content-Type ---
         if (contentType && contentType.includes('text/html')) {
             const $ = cheerio.load(responseData.toString('utf8'));
 
-            // שכתוב קישורי HTML (href, src, action)
-            $('a[href], link[href], img[src], script[src], iframe[src], video[src], audio[src], source[src], form[action]').each((i, elem) => {
+            // שכתוב קישורי HTML
+            $('a[href], link[href], img[src], iframe[src], video[src], audio[src], source[src]').each((i, elem) => {
                 const element = $(elem);
-                let attr;
-                if (elem.tagName === 'A' || elem.tagName === 'LINK') {
-                    attr = 'href';
-                } else if (elem.tagName === 'FORM') {
-                    attr = 'action';
-                } else {
-                    attr = 'src';
-                }
-
+                const attr = element.attr('href') ? 'href' : 'src';
                 const originalValue = element.attr(attr);
                 if (originalValue) {
-                    element.attr(attr, rewriteUrl(originalValue, baseUrlOfProxy, targetUrl));
+                    element.attr(attr, rewriteUrlServer(originalValue, baseUrlOfProxy, targetUrl));
+                }
+            });
+
+            // שכתוב action של טפסים
+            $('form[action]').each((i, elem) => {
+                const element = $(elem);
+                const originalAction = element.attr('action');
+                if (originalAction) {
+                    element.attr('action', rewriteUrlServer(originalAction, baseUrlOfProxy, targetUrl));
                 }
             });
 
@@ -345,43 +408,53 @@ app.get('/proxy', async (req, res) => {
                 let cssText = $(elem).html();
                 if (cssText) {
                     cssText = cssText.replace(/url\(['"]?(.*?)['"]?\)/g, (match, url) => {
-                        return `url('${rewriteUrl(url, baseUrlOfProxy, targetUrl)}')`;
+                        return `url('${rewriteUrlServer(url, baseUrlOfProxy, targetUrl)}')`;
                     });
                     $(elem).html(cssText);
                 }
             });
 
-            // ניסיון להסיר את ה-base tag אם קיים (עלול לשבש URL יחסיים)
+            // שכתוב src של תגי script (כדי שקובצי JS יטענו דרך הפרוקסי)
+            $('script[src]').each((i, elem) => {
+                const element = $(elem);
+                const originalSrc = element.attr('src');
+                if (originalSrc) {
+                    element.attr('src', rewriteUrlServer(originalSrc, baseUrlOfProxy, targetUrl));
+                }
+            });
+
+
+            // ניסיון להסיר את ה-base tag
             $('base[href]').remove();
 
-            // המרה חזרה לבאפר
+            // *** הזרקת קוד ה-JavaScript של הלקוח ליירוט בקשות ***
+            // הכנס את הסקריפט שלנו בתחילת ה-<body> או בסוף ה-<head>
+            $('head').prepend(clientRewritingScript);
+            // או: $('body').prepend(clientRewritingScript);
+
             responseData = Buffer.from($.html(), 'utf8');
 
         } else if (contentType && contentType.includes('text/css')) {
-            // שכתוב URL-ים בתוך קבצי CSS חיצוניים
             let cssText = responseData.toString('utf8');
             cssText = cssText.replace(/url\(['"]?(.*?)['"]?\)/g, (match, url) => {
-                // ה-targetUrl הוא ה-URL של קובץ ה-CSS עצמו
-                return `url('${rewriteUrl(url, baseUrlOfProxy, targetUrl)}')`;
+                return `url('${rewriteUrlServer(url, baseUrlOfProxy, targetUrl)}')`;
             });
             responseData = Buffer.from(cssText, 'utf8');
 
         } else if (contentType && (contentType.includes('application/javascript') || contentType.includes('text/javascript'))) {
-            // בשלב זה, אנו רק מעבירים את קובץ ה-JavaScript כפי שהוא.
-            // שכתוב תוכן ה-JS עצמו מורכב מדי עבור גישה זו.
-            // לכן, קריאות AJAX, fetch וכו', לא ישוכתבו.
-            console.log(`Serving JavaScript file: ${targetUrl} without rewriting its content.`);
-            // responseData נשאר כפי שהוא (Buffer)
+            // בשלב זה, אנו מעבירים קובצי JS כפי שהם, אך ה-clientRewritingScript
+            // אמור ליירט קריאות רשת מתוכם.
+            // אין צורך לשכתב את תוכן ה-JS עצמו בשרת כרגע.
+            console.log(`[Server] Serving JavaScript file: ${targetUrl} (client-side rewriting enabled via injected script).`);
         }
-        // --- סוף לוגיקת שכתוב תוכן ---
+        // עבור סוגי תוכן אחרים (תמונות, וידאו וכו'), נשלח אותם ישירות
+        // כי הם לא דורשים שכתוב פנימי.
 
-
-        // העברת כותרות - חשוב מאוד!
         const headersToExclude = [
             'content-encoding', 'transfer-encoding', 'connection', 'keep-alive',
             'proxy-authenticate', 'proxy-authorization',
             'content-security-policy', 'x-frame-options', 'strict-transport-security',
-            'set-cookie' // עדיין מסירים עוגיות, טיפול בהן מורכב
+            'set-cookie'
         ];
 
         for (const key in response.headers) {
@@ -389,7 +462,6 @@ app.get('/proxy', async (req, res) => {
                 res.setHeader(key, response.headers[key]);
             }
         }
-        // וודא שה-Content-Type נשמר
         res.setHeader('Content-Type', contentType || 'application/octet-stream');
         res.send(responseData);
 
