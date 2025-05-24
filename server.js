@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const axios = require('axios'); // נשתמש ב-axios לביצוע בקשות HTTP
+const axios = require('axios');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors()); // מאפשר גישה מכל מקור (חשוב לפרוקסי)
+app.use(cors());
 
 // --- נתיב לדף הבית (ה"נקי" של הרדיו + פרוקסי UI) ---
 app.get('/', (req, res) => {
@@ -27,7 +27,7 @@ app.get('/', (req, res) => {
             text-align: center;
             padding: 50px;
             color: white;
-            margin: 0; /* הסרת שוליים ברירת מחדל */
+            margin: 0;
         }
         h1 {
             color: #fff;
@@ -38,22 +38,22 @@ app.get('/', (req, res) => {
         }
         .radio-container {
             display: flex;
-            justify-content: center; /* ריכוז במרכז */
-            flex-wrap: wrap; /* מעבר שורה לפריטים רבים */
+            justify-content: center;
+            flex-wrap: wrap;
             gap: 30px;
             margin-bottom: 50px;
         }
         .radio-item {
-            background-color: rgba(0, 0, 0, 0.6); /* רקע כהה יותר, שקיפות מעט גבוהה יותר */
+            background-color: rgba(0, 0, 0, 0.6);
             border-radius: 10px;
             padding: 20px;
             width: 250px;
             text-align: center;
-            transition: border 0.3s ease-in-out, transform 0.2s ease-in-out; /* הוספת אנימציה למעבר עכבר */
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* צל קל */
+            transition: border 0.3s ease-in-out, transform 0.2s ease-in-out;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
         .radio-item:hover {
-            transform: translateY(-5px); /* אפקט קל במעבר עכבר */
+            transform: translateY(-5px);
         }
         .radio-item.active {
             border: 3px solid #ff9800;
@@ -63,12 +63,12 @@ app.get('/', (req, res) => {
             height: 150px;
             object-fit: contain;
             margin-bottom: 15px;
-            border-radius: 8px; /* פינות מעוגלות לתמונות */
+            border-radius: 8px;
         }
         .radio-item h2 {
             font-size: 20px;
             margin: 10px 0;
-            color: #ff9800; /* צבע כותרת שונה */
+            color: #ff9800;
         }
         .link-button {
             display: inline-block;
@@ -87,13 +87,13 @@ app.get('/', (req, res) => {
         }
         audio {
             width: 80%;
-            max-width: 600px; /* הגבלת רוחב לנגן אודיו */
+            max-width: 600px;
             margin-top: 20px;
             border-radius: 10px;
-            background-color: rgba(255, 255, 255, 0.1); /* רקע שקוף לנגן */
+            background-color: rgba(255, 255, 255, 0.1);
         }
         .proxy-section {
-            background-color: rgba(0, 0, 0, 0.7); /* רקע כהה יותר לפרוקסי */
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 40px 20px;
             margin-top: 50px;
             border-radius: 15px;
@@ -103,7 +103,7 @@ app.get('/', (req, res) => {
             margin-right: auto;
         }
         .proxy-section h1 {
-            color: #00bcd4; /* צבע שונה לכותרת הפרוקסי */
+            color: #00bcd4;
             margin-bottom: 25px;
         }
         .proxy-form {
@@ -125,7 +125,7 @@ app.get('/', (req, res) => {
             font-size: 16px;
         }
         .proxy-form button {
-            background-color: #00bcd4; /* כפתור פרוקסי בצבע שונה */
+            background-color: #00bcd4;
             color: white;
             padding: 12px 25px;
             border: none;
@@ -143,7 +143,7 @@ app.get('/', (req, res) => {
             height: 600px;
             border: 1px solid #444;
             border-radius: 10px;
-            background-color: white; /* רקע לבן ל-iframe */
+            background-color: white;
         }
         footer {
             margin-top: 50px;
@@ -233,55 +233,49 @@ app.get('/', (req, res) => {
     <script>
         // Script 2: Proxy Form Logic
         document.getElementById('proxyForm').addEventListener('submit', async function(event) {
-            event.preventDefault(); // מונע שליחת טופס רגילה
+            event.preventDefault();
             const url = document.getElementById('urlInput').value;
             const proxyFrame = document.getElementById('proxyFrame');
 
-            // בדיקה בסיסית אם ה-URL שהוזן הוא תקין
             try {
-                new URL(url); // יזרוק שגיאה אם ה-URL לא תקין
+                new URL(url);
             } catch (e) {
                 alert('אנא הכנס כתובת URL תקינה (עם https:// או http://)');
                 return;
             }
 
-            // נשלח את הבקשה לשרת הפרוקסי שלנו
-            // כאן הייתה הבעיה הקודמת (תו `{` לא צפוי) - הקוד נראה תקין עם גרשיים הפוכים (backticks)
-            const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
+            const proxyUrl = \`/proxy?url=\${encodeURIComponent(url)}\`; // שימוש ב-backticks גם כאן
             proxyFrame.src = proxyUrl;
         });
     </script>
 
 </body>
 </html>
-    `; // סגירת המחרוזת הרב-שורתית כאן
+    `; // סגירת המחרוזת הרב-שורתית כאן - וודא שזה בדיוק בסוף ה-HTML
     res.header('Content-Type', 'text/html; charset=utf-8');
     res.send(pageHtml);
 });
 
 // --- נתיב הפרוקסי ---
 app.get('/proxy', async (req, res) => {
-    const targetUrl = req.query.url; // קבלת ה-URL מה-query parameter
+    const targetUrl = req.query.url;
 
     if (!targetUrl) {
         return res.status(400).send('URL parameter is missing.');
     }
 
     try {
-        // ביצוע בקשה ל-URL היעד
         const response = await axios.get(targetUrl, {
-            responseType: 'arraybuffer', // כדי לטפל בנתונים בינאריים (תמונות, קבצי קול וכו')
+            responseType: 'arraybuffer',
             headers: {
-                'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', // העבר את ה-User-Agent המקורי או ברירת מחדל
+                'User-Agent': req.headers['user-agent'] || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                 'Accept': req.headers['accept'] || '*/*',
-                'Accept-Encoding': req.headers['accept-encoding'] || 'identity', // חשוב לא לדחוס
+                'Accept-Encoding': req.headers['accept-encoding'] || 'identity',
                 'Accept-Language': req.headers['accept-language'] || 'en-US,en;q=0.9',
                 'Connection': 'keep-alive'
             }
         });
 
-        // העברת הכותרות המקוריות מהשרת היעד לדפדפן
-        // יש להיזהר מכותרות מסוימות שיכולות לגרום לבעיות אבטחה או התנהגות לא צפויה
         const headersToExclude = ['content-encoding', 'transfer-encoding', 'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization'];
         for (const key in response.headers) {
             if (response.headers.hasOwnProperty(key) && !headersToExclude.includes(key.toLowerCase())) {
@@ -289,26 +283,21 @@ app.get('/proxy', async (req, res) => {
             }
         }
 
-        // שליחת הנתונים מהשרת היעד חזרה לדפדפן
         res.send(response.data);
 
     } catch (error) {
         console.error('Proxy request failed:', error.message);
         if (error.response) {
             console.error('Target URL responded with status:', error.response.status);
-            // אם השרת היעד החזיר שגיאה (לדוגמה 404, 500), העבר אותה
             res.status(error.response.status).send(`Error fetching URL: ${error.response.status} ${error.response.statusText || error.message}`);
         } else if (error.request) {
-            // הבקשה נשלחה אך לא התקבלה תגובה (לדוגמה, בעיות רשת)
             res.status(500).send('No response received from target URL. Check your internet connection or the URL.');
         } else {
-            // שגיאה בהגדרת הבקשה
             res.status(500).send(`An error occurred while setting up the request: ${error.message}`);
         }
     }
 });
 
-// מפעיל את השרת
 app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
     console.log(`Visit http://localhost:${PORT} to see the radio and proxy page.`);
