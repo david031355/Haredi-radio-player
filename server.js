@@ -1,5 +1,5 @@
 const express = require('express');
-const cors = require = require('cors'); // תיקון כאן, כנראה שגיאת הקלדה קודמת
+const cors = require('cors'); 
 const axios = require('axios');
 const cheerio = require('cheerio');
 const app = express();
