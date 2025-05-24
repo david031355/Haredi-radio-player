@@ -8,6 +8,7 @@ app.use(cors()); // מאפשר גישה מכל מקור (חשוב לפרוקסי
 
 // --- נתיב לדף הבית (ה"נקי" של הרדיו + פרוקסי UI) ---
 app.get('/', (req, res) => {
+    // שימו לב לשימוש ב-backticks (`) כדי להגדיר מחרוזת רב-שורתית
     const pageHtml = `
 <!DOCTYPE html>
 <html lang="he">
@@ -183,74 +184,77 @@ app.get('/', (req, res) => {
 
         <div class="radio-item">
             <img src="data:image/svg+xml,%3csvg%20id='Group_5050'%20data-name='Group%205050'%20xmlns='http://www.w3.org/2000/svg'%20width='70.382'%20height='42.98'%20viewBox='0%200%2070.382%2042.98'%3e%3cg%20id='Group_4156'%20data-name='Group%204156'%20transform='translate(31.57%2013.207)'%3e%3cg%20id='Group_4155'%20data-name='Group%204155'%20transform='translate(0)'%3e%3cpath%20id='Path_1522'%20data-name='Path%201522'%20d='M64.579-53.441H62.993A4.834,4.834,0,0,0,58.1-49.085L56.667-35.4h5.965Z'%20transform='translate(-56.667%2053.441)'%20fill='%2300059b'/%3e%3c/g%3e%3c/g%3e%3cg%20id='Group_4158'%20data-name='Group%204158'%20transform='translate(0%2013.207)'%3e%3cg%20id='Group_4157'%20data-name='Group%204157'%3e%3cpath%20id='Path_1523'%20data-name='Path%201523'%20d='M.031-48.23A5.313,5.313,0,0,0,5.4-42.2L6.567-53.442H.6Z'%20transform='translate(0%2053.442)'%20fill='%23db1419'/%3e%3c/g%3e%3c/g%3e%3cg%20id='Group_4160'%20data-name='Group%204160'%20transform='translate(6.524%2013.207)'%3e%3cg%20id='Group_4159'%20data-name='Group%204159'%20transform='translate(0)'%3e%3cpath%20id='Path_1524'%20data-name='Path%201524'%20d='M29.317-47.74a5.39,5.39,0,0,0-5.268-5.7h-11L11.741-41.389A5.3,5.3,0,0,0,17.113-35.4l1.269-12.01h2.963A1.777,1.777,0,0,1,23.1-45.5L22.023-35.4H28.03Z'%20transform='translate(-11.71%2053.441)'%20fill='%23db1419'/%3e%3c/g%3e%3c/g%3e%3cg%20id='Group_4162'%20data-name='Group%204162'%20transform='translate(40.331%2013.331)'%3e%3cg%20id='Group_4161'%20data-name='Group%204161'%3e%3cpath%20id='Path_1525'%20data-name='Path%201525'%20d='M82.955-53.219H72.97l-.578,5.659h8.075a1.9,1.9,0,0,1,1.892,2.076L82.212-44.1c-.187,1.954-.846,2.971-2.866,3.135l-.618,5.659A9.34,9.34,0,0,0,88.153-43.9l.344-3.216a5.627,5.627,0,0,0-5.542-6.106'%20transform='translate(-72.393%2053.219)'%20fill='%2300059b'/%3e%3c/g%3e%3c/g%3e%3cg%20id='Group_4164'%20data-name='Group%204164'%20transform='translate(38.596%2020.699)'%3e%3cg%20id='Group_4163'%20data-name='Group%204163'%3e%3cpath%20id='Path_1526'%20data-name='Path%201526'%20d='M69.278-25.294h.041a6.761,6.761,0,0,0,6.521-5.987l.933-8.713H70.849Z'%20transform='translate(-69.278%2039.994)'%20fill='%2300059b'/%3e%3c/g%3e%3c/g%3e%3cg%20id='Group_4166'%20data-name='Group%204166'%20transform='translate(24.061%206.57)'%3e%3cg%20id='Group_4165'%20data-name='Group%204165'%3e%3cpath%20id='Path_1527'%20data-name='Path%201527'%20d='M53.151-65.354H53.11c-3.917.286-6.46,2.2-7.552,5.742a11.214,11.214,0,0,0-.563,2.4c-.367,3.461-1.807,16.531-1.807,16.531h6.089l.146-1.383.044-.531,1.31-12.05a6.381,6.381,0,0,1,6.418-5.742h1.461c0-1.14-.429-4.968-5.5-4.968'%20transform='translate(-43.188%2065.354)'%20fill='%2300059b'/%3e%3c/g%3e%3c/g%3e%3cg%20id='Group_4167'%20data-name='Group%204167'%20transform='translate(48.902%2021.967)'%3e%3cpath%20id='Path_1528'%20data-name='Path%201528'%20d='M-8.943-5.265-7.59.149A.63.63,0,0,1-8.363.91l-5.6-1.495a13.179,13.179,0,0,1-5.349,1.5c-.135.011-.266.036-.4.043V.938c-.152.005-.3.023-.454.023h-.026V9.124A21.422,21.422,0,0,0-5,2.83,21.422,21.422,0,0,0,1.286-11.889H-6.925A13.183,13.183,0,0,1-8.943-5.265'%20transform='translate(20.192%2011.889)'%20fill='%23db1419'/%3e%3c/g%3e%3cg%20id='Group_4168'%20data-name='Group%204168'%20transform='translate(48.902%200)'%3e%3cpath%20id='Path_1529'%20data-name='Path%201529'%20d='M-17.075-16.76A21.419,21.419,0,0,0-23.36-31.548a21.422,21.422,0,0,0-15.2-6.294v8.306l.026,0c.153,0,.3.018.454.023v-.023c.15.008.3.033.445.046A13.236,13.236,0,0,1-25.3-16.76Z'%20transform='translate(38.555%2037.842)'%20fill='%2300059b'/%3e%3c/g%3e%3cg%20id='Group_4240'%20data-name='Group%204240'%20transform='translate(0%200)'%3e%3cpath%20id='Path_1530'%20data-name='Path%201530'%20d='M0-34.167H70.382v-42.98H0Z'%20transform='translate(0%2077.147)'%20fill='none'/%3e%3c/g%3e%3c/svg%3e" alt="קול חי">
-                <h2>קול חי</h2>
-                <a href="#" class="link-button" onclick="playAudio('https://media2.93fm.co.il/live-new', this)">האזן עכשיו</a>
-            </div>
+            <h2>קול חי</h2>
+            <a href="#" class="link-button" onclick="playAudio('https://media2.93fm.co.il/live-new', this)">האזן עכשיו</a>
         </div>
+    </div>
 
-        <div>
-            <audio id="audioPlayer" controls>
-                <source id="audioSource" src="" type="audio/mpeg">
-                הדפדפן שלך לא תומך בנגן אודיו.
-            </audio>
-        </div>
+    <div>
+        <audio id="audioPlayer" controls>
+            <source id="audioSource" src="" type="audio/mpeg">
+            הדפדפן שלך לא תומך בנגן אודיו.
+        </audio>
+    </div>
 
-        <script>
-            let currentActiveItem = null;
+    <script>
+        // Script 1: Audio Player Logic
+        let currentActiveItem = null;
 
-            function playAudio(audioURL, clickedElement) {
-                var audioPlayer = document.getElementById('audioPlayer');
-                var audioSource = document.getElementById('audioSource');
-                audioSource.src = audioURL;
-                audioPlayer.load();
-                audioPlayer.play();
+        function playAudio(audioURL, clickedElement) {
+            var audioPlayer = document.getElementById('audioPlayer');
+            var audioSource = document.getElementById('audioSource');
+            audioSource.src = audioURL;
+            audioPlayer.load();
+            audioPlayer.play();
 
-                if (currentActiveItem) {
-                    currentActiveItem.classList.remove('active');
-                }
-
-                const radioItem = clickedElement.closest('.radio-item');
-                radioItem.classList.add('active');
-                currentActiveItem = radioItem;
+            if (currentActiveItem) {
+                currentActiveItem.classList.remove('active');
             }
-        </script>
 
-        <div class="proxy-section">
-            <h1>גישת פרוקסי (לשימוש מחוץ לסינון)</h1>
-            <form id="proxyForm" class="proxy-form">
-                <input type="text" id="urlInput" placeholder="הכנס כתובת URL (לדוגמה: https://www.example.com)">
-                <button type="submit">טען דרך פרוקסי</button>
-            </form>
-            <iframe id="proxyFrame"></iframe>
-        </div>
+            const radioItem = clickedElement.closest('.radio-item');
+            radioItem.classList.add('active');
+            currentActiveItem = radioItem;
+        }
+    </script>
 
-        <footer>
-            <p>&copy; 2025 Haredi Radio Player. All rights reserved.</p>
-        </footer>
+    <div class="proxy-section">
+        <h1>גישת פרוקסי (לשימוש מחוץ לסינון)</h1>
+        <form id="proxyForm" class="proxy-form">
+            <input type="text" id="urlInput" placeholder="הכנס כתובת URL (לדוגמה: https://www.example.com)">
+            <button type="submit">טען דרך פרוקסי</button>
+        </form>
+        <iframe id="proxyFrame"></iframe>
+    </div>
 
-        <script>
-            document.getElementById('proxyForm').addEventListener('submit', async function(event) {
-                event.preventDefault(); // מונע שליחת טופס רגילה
-                const url = document.getElementById('urlInput').value;
-                const proxyFrame = document.getElementById('proxyFrame');
+    <footer>
+        <p>&copy; 2025 Haredi Radio Player. All rights reserved.</p>
+    </footer>
 
-                // בדיקה בסיסית אם ה-URL שהוזן הוא תקין
-                try {
-                    new URL(url); // יזרוק שגיאה אם ה-URL לא תקין
-                } catch (e) {
-                    alert('אנא הכנס כתובת URL תקינה (עם https:// או http://)');
-                    return;
-                }
+    <script>
+        // Script 2: Proxy Form Logic
+        document.getElementById('proxyForm').addEventListener('submit', async function(event) {
+            event.preventDefault(); // מונע שליחת טופס רגילה
+            const url = document.getElementById('urlInput').value;
+            const proxyFrame = document.getElementById('proxyFrame');
 
-                // נשלח את הבקשה לשרת הפרוקסי שלנו
-                const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
-                proxyFrame.src = proxyUrl;
-            });
-        </script>
+            // בדיקה בסיסית אם ה-URL שהוזן הוא תקין
+            try {
+                new URL(url); // יזרוק שגיאה אם ה-URL לא תקין
+            } catch (e) {
+                alert('אנא הכנס כתובת URL תקינה (עם https:// או http://)');
+                return;
+            }
 
-    </body>
-    </html>
-    `;
+            // נשלח את הבקשה לשרת הפרוקסי שלנו
+            // כאן הייתה הבעיה הקודמת (תו `{` לא צפוי) - הקוד נראה תקין עם גרשיים הפוכים (backticks)
+            const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
+            proxyFrame.src = proxyUrl;
+        });
+    </script>
+
+</body>
+</html>
+    `; // סגירת המחרוזת הרב-שורתית כאן
     res.header('Content-Type', 'text/html; charset=utf-8');
     res.send(pageHtml);
 });
