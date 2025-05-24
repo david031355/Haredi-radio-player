@@ -1,5 +1,5 @@
 const express = require('express');
-const cors = require('cors');
+const cors = require = require('cors'); // תיקון כאן, כנראה שגיאת הקלדה קודמת
 const axios = require('axios');
 const cheerio = require('cheerio');
 const app = express();
@@ -23,6 +23,11 @@ const clientRewritingScript = `
             if (!originalUrl) return originalUrl;
             try {
                 const url = new URL(originalUrl, window.location.href);
+                // ודא שה-URL הוא יחסי או מאותו דומיין, אחרת שכתב אותו
+                if (url.origin === window.location.origin && !url.pathname.startsWith('/proxy')) {
+                    // אם זה משאב מקומי בפרוקסי, אל תשכתב שוב
+                    return originalUrl;
+                }
                 return proxyBaseUrl + encodeURIComponent(url.href);
             } catch (e) {
                 console.warn('[Client] Could not rewrite URL:', originalUrl, e);
@@ -40,10 +45,12 @@ const clientRewritingScript = `
                     // טיפול באובייקט Request - ניצור אובייקט חדש עם URL משוכתב
                     try {
                         const newUrl = rewriteUrlClient(resource.url);
+                        // יש לשים לב שאם ה-body כבר נקרא, הוא לא יהיה זמין שוב.
+                        // זה פתרון חלקי עבור המקרים הללו.
                         const newRequest = new Request(newUrl, {
                             method: resource.method,
                             headers: new Headers(resource.headers),
-                            body: resource.bodyUsed ? undefined : resource.body, // לא ניתן לקרוא body פעמיים
+                            body: resource.bodyUsed ? null : (resource.body || null),
                             mode: resource.mode,
                             credentials: resource.credentials,
                             cache: resource.cache,
@@ -52,7 +59,6 @@ const clientRewritingScript = `
                             integrity: resource.integrity,
                             keepalive: resource.keepalive,
                             signal: resource.signal,
-                            // Add other Request properties as needed
                         });
                         resource = newRequest;
                         console.log('Rewrote fetch Request object URL:', newUrl);
@@ -81,7 +87,6 @@ const clientRewritingScript = `
         }
 
         // גם לטפל בהפניות של form submissions אם הן לא נקלטות ע"י ה-action attribute
-        // זה לא קשור ישירות ל-fetch/XHR, אבל זה מנגנון נוסף
         document.addEventListener('submit', function(e) {
             const form = e.target;
             if (form && form.tagName === 'FORM' && form.action) {
@@ -96,13 +101,13 @@ const clientRewritingScript = `
                     console.warn('Could not rewrite form action:', form.action, err);
                 }
             }
-        }, true); // Use capture phase to catch before other handlers
+        }, true);
     })();
 </script>
 `;
 
 
-// --- נתיב לדף הבית (ה"נקי" של הרדיו + פרוקסי UI) ---
+// --- נתיב לדף הבית (רק הרדיו, בלי הפרוקסי UI) ---
 app.get('/', (req, res) => {
     const pageHtml = `
 <!DOCTYPE html>
@@ -111,7 +116,7 @@ app.get('/', (req, res) => {
     <meta charset="UTF-8">
     <link rel="icon" href="https://www.reshot.com/preview-assets/icons/EQFBGJ6SY9/radio-EQFBGJ6SY9.svg" type="image/svg+xml">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>תחנות הרדיו החרדיות וגישת פרוקסי</title>
+    <title>תחנות הרדיו החרדיות</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew&display=swap" rel="stylesheet">
     <style>
         body {
@@ -187,59 +192,6 @@ app.get('/', (req, res) => {
             border-radius: 10px;
             background-color: rgba(255, 255, 255, 0.1);
         }
-        .proxy-section {
-            background-color: rgba(0, 0, 0, 0.7);
-            padding: 40px 20px;
-            margin-top: 50px;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            max-width: 900px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        .proxy-section h1 {
-            color: #00bcd4;
-            margin-bottom: 25px;
-        }
-        .proxy-form {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .proxy-form input[type="text"] {
-            width: 70%;
-            max-width: 500px;
-            padding: 12px 15px;
-            border-radius: 8px;
-            border: 1px solid #555;
-            background-color: #333;
-            color: white;
-            font-size: 16px;
-        }
-        .proxy-form button {
-            background-color: #00bcd4;
-            color: white;
-            padding: 12px 25px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background-color 0.3s, transform 0.2s;
-        }
-        .proxy-form button:hover {
-            background-color: #0097a7;
-            transform: translateY(-2px);
-        }
-        #proxyFrame {
-            width: 100%;
-            height: 600px;
-            border: 1px solid #444;
-            border-radius: 10px;
-            background-color: white;
-        }
         footer {
             margin-top: 50px;
             font-size: 14px;
@@ -291,6 +243,10 @@ app.get('/', (req, res) => {
         </audio>
     </div>
 
+    <footer>
+        <p>&copy; 2025 Haredi Radio Player. All rights reserved.</p>
+    </footer>
+
     <script>
         let currentActiveItem = null;
 
@@ -309,38 +265,6 @@ app.get('/', (req, res) => {
             radioItem.classList.add('active');
             currentActiveItem = radioItem;
         }
-    </script>
-
-    <div class="proxy-section">
-        <h1>גישת פרוקסי (לשימוש מחוץ לסינון)</h1>
-        <form id="proxyForm" class="proxy-form">
-            <input type="text" id="urlInput" placeholder="הכנס כתובת URL (לדוגמה: https://www.example.com)">
-            <button type="submit">טען דרך פרוקסי</button>
-        </form>
-        <iframe id="proxyFrame"></iframe>
-    </div>
-
-    <footer>
-        <p>&copy; 2025 Haredi Radio Player. All rights reserved.</p>
-    </footer>
-
-    <script>
-        document.getElementById('proxyForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const url = document.getElementById('urlInput').value;
-            const proxyFrame = document.getElementById('proxyFrame');
-
-            try {
-                new URL(url);
-            } catch (e) {
-                alert('אנא הכנס כתובת URL תקינה (עם https:// או http://)');
-                return;
-            }
-
-            // נשלח את הבקשה לשרת הפרוקסי שלנו
-            const proxyUrl = \`/proxy?url=\${encodeURIComponent(url)}\`;
-            proxyFrame.src = proxyUrl;
-        });
     </script>
 
 </body>
@@ -391,6 +315,18 @@ app.get('/proxy', async (req, res) => {
             'Sec-Fetch-User': '?1',
             'Upgrade-Insecure-Requests': '1',
         };
+
+        // --- הוספה חדשה: הוספת header לנטפרי עבור תמונות ---
+        // בדיקה לפי סיומת קובץ - לא מושלם אבל מכסה את רוב המקרים
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+        const urlPath = urlObj.pathname.toLowerCase();
+        const isImage = imageExtensions.some(ext => urlPath.endsWith(ext));
+
+        if (isImage) {
+            requestHeaders['x-netfree-option-no-send-images'] = '1';
+            console.log(`[Server] Added x-netfree-option-no-send-images header for image: ${targetUrl}`);
+        }
+        // --- סוף הוספה חדשה ---
 
         response = await axios.get(targetUrl, {
             responseType: 'arraybuffer', // לקבל נתונים בינאריים
@@ -462,7 +398,6 @@ app.get('/proxy', async (req, res) => {
             // *** הזרקת קוד ה-JavaScript של הלקוח ליירוט בקשות ***
             // הכנס את הסקריפט שלנו בתחילת ה-<body> או בסוף ה-<head>
             $('head').prepend(clientRewritingScript);
-            // או: $('body').prepend(clientRewritingScript);
 
             responseData = Buffer.from($.html(), 'utf8');
 
@@ -507,6 +442,6 @@ app.get('/proxy', async (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
-    console.log(`Visit http://localhost:${PORT} to see the radio and proxy page.`);
-    console.log(`To use proxy API directly: http://localhost:${PORT}/proxy?url=YOUR_URL_HERE`);
+    console.log(`Visit http://localhost:${PORT} to see the radio player.`);
+    console.log(`To use proxy API: http://localhost:${PORT}/proxy?url=YOUR_URL_HERE`);
 });
