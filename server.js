@@ -206,4 +206,31 @@ app.get('/', (req, res) => {
 </head>
 <body>
 
-    <h1>האז
+    <h1>האזנה לתחנות הרדיו החרדיות</h1>
+    <p>בחר תחנה להאזנה:</p>
+
+    <div class="radio-container">
+        <div class="radio-item">
+            <img src="https://www.likol.co.il/wp-content/uploads/2019/04/Station_Share_Image6_img__2.jpg" alt="רדיו מורשת">
+            <h2>רדיו מורשת</h2><a href="#" class="link-button" onclick="playAudio('/proxy?url=' + encodeURIComponent('https://playerservices.streamtheworld.com/api/livestream-redirect/KAN_MORESHET.mp3?dist=rlive'), this)">האזן עכשיו</a>
+        </div>
+
+        <div class="radio-item">
+            <img src="https://kol-play.co.il/wp-content/themes/kolplay/images/logo.png" alt="קול פליי">
+            <h2>קול פליי</h2>
+            <a href="#" class="link-button" onclick="playAudio('/proxy?url=' + encodeURIComponent('https://cdn.cybercdn.live/Kol_Barama/Music/icecast.audio'), this)">האזן עכשיו</a>
+        </div>
+
+        <div class="radio-item">
+            <img src="https://kol-barama.co.il/wp-content/uploads/2024/05/LOGO_KOL-BARAMA_WHITE-e1715205528822.png" alt="קול ברמה">
+            <h2>קול ברמה</h2>
+            <a href="#" class="link-button" onclick="playAudio('/proxy?url=' + encodeURIComponent('https://cdn.cybercdn.live/Kol_Barama/Live_Audio/icecast.audio'), this)">האזן עכשיו</a>
+        </div>
+
+        <div class="radio-item">
+            <img src="https://kcm.fm/static/images/logo.svg" alt="קול חי מיוזיק">
+            <h2>קול חי מיוזיק</h2>
+            <a href="#" class="link-button" onclick="playAudio('/proxy?url=' + encodeURIComponent('https://live.kcm.fm/livemusic'), this)">האזן עכשיו</a>
+        </div>
+        
+        <div class="radio-item">  <img src="data:image/svg+xml,%3csvg%20id='Group_5050'%20data-name='Group%205050'%20xmlns='
